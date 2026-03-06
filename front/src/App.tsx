@@ -13,6 +13,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import queryClient from "./Utils/QueryConfig.tsx";
 import Loader from "./LazyLoading/Loader.tsx";
 import { Toaster } from "react-hot-toast";
+import { Analytics } from "@vercel/analytics/react";
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
           </Routes>
         </Suspense>
       </Router>
+      <Analytics />
     </QueryClientProvider>
   );
 }
