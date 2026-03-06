@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/Utils/AxiosWrapper";
-import { AlertTriangle, Clock3, SearchX, Star } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, SearchX, Star } from "lucide-react";
 import AppMenu from "@/Components/AppMenu";
 import { formatRelativeTime } from "@/lib/time";
 import { PopularSkeleton } from "@/Components/Skeletons";
@@ -22,6 +22,7 @@ interface Candidate {
 interface DistrictCandidates {
   districtName: string;
   districtUrl?: string;
+  isCompleted?: boolean;
   leaderCandidate: Candidate;
   sideCandidates: Candidate[];
 }
@@ -30,6 +31,7 @@ interface PopularCandidatesResponse {
   count: number;
   lastScraped?: string | null;
   cacheUpdatedAt?: string | null;
+  isCompleted?: boolean;
   candidates: DistrictCandidates[];
 }
 
@@ -42,15 +44,25 @@ const formatVoteChange = (value?: string) => {
   return value.startsWith("+") ? value : `+${value}`;
 };
 
-const LeaderCard = ({ candidate }: { candidate: Candidate }) => (
-  <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-b from-primary/15 via-card/90 to-card/90 p-4 shadow-[0_20px_45px_-30px_rgba(0,0,0,0.95)]">
-    <div className="pointer-events-none absolute right-[-42px] top-[-42px] h-28 w-28 rounded-full bg-primary/15 blur-2xl" />
-    <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">Leading candidate</p>
+const LeaderCard = ({ candidate, isCompleted }: { candidate: Candidate; isCompleted?: boolean }) => (
+  <div className={`relative overflow-hidden rounded-2xl border p-4 shadow-[0_20px_45px_-30px_rgba(0,0,0,0.95)] ${
+    isCompleted
+      ? "border-emerald-500/40 bg-gradient-to-b from-emerald-500/20 via-card/90 to-card/90"
+      : "border-primary/20 bg-gradient-to-b from-primary/15 via-card/90 to-card/90"
+  }`}>
+    <div className={`pointer-events-none absolute right-[-42px] top-[-42px] h-28 w-28 rounded-full blur-2xl ${
+      isCompleted ? "bg-emerald-500/20" : "bg-primary/15"
+    }`} />
+    <p className={`mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] ${
+      isCompleted ? "text-emerald-400" : "text-primary/80"
+    }`}>
+      {isCompleted ? "✓ Winner" : "Leading candidate"}
+    </p>
     <div className="flex items-start gap-3">
       <img
         src={candidate.avatar || IMAGE_FALLBACK}
         alt={candidate.name}
-        className="h-16 w-16 rounded-xl object-cover ring-2 ring-primary/30"
+        className={`h-16 w-16 rounded-xl object-cover ring-2 ${isCompleted ? "ring-emerald-500/50" : "ring-primary/30"}`}
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-lg font-bold tracking-tight text-foreground">{candidate.name || "Unknown candidate"}</p>
@@ -181,7 +193,12 @@ const TestPage = () => {
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Election Dashboard</p>
               <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">Popular Candidates by District</h1>
-
+              {data?.isCompleted && (
+                <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-400">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Election Completed
+                </span>
+              )}
             </div>
             <div className="rounded-xl border border-primary/35 bg-primary/10 px-3 py-2 text-right">
               <p className="inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.14em] text-primary/90">
@@ -227,10 +244,22 @@ const TestPage = () => {
             {filteredDistricts.map((district) => (
               <article
                 key={`${district.districtName}-${district.districtUrl || "no-url"}`}
-                className="rounded-2xl border border-border bg-card/75 p-4 shadow-[0_15px_40px_-28px_rgba(0,0,0,0.85)]"
+                className={`rounded-2xl border p-4 ${
+                  district.isCompleted
+                    ? "border-emerald-500/40 bg-gradient-to-br from-emerald-500/10 via-card/80 to-card/75 shadow-[0_15px_40px_-28px_rgba(16,185,129,0.4)]"
+                    : "border-border bg-card/75 shadow-[0_15px_40px_-28px_rgba(0,0,0,0.85)]"
+                }`}
               >
                 <div className="mb-4 flex items-center justify-between gap-3 border-b border-border/70 pb-3">
-                  <h2 className="text-lg font-semibold">{district.districtName}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold">{district.districtName}</h2>
+                    {district.isCompleted && (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/20 px-3 py-1 text-sm font-bold text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Elected
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -251,7 +280,7 @@ const TestPage = () => {
 
                 <div className="grid gap-4 lg:grid-cols-5">
                   <section className="lg:col-span-2">
-                    <LeaderCard candidate={district.leaderCandidate} />
+                    <LeaderCard candidate={district.leaderCandidate} isCompleted={district.isCompleted} />
                   </section>
 
                   <section className="rounded-xl border border-border/70 bg-background/60 p-3 lg:col-span-3">

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import api from "@/Utils/AxiosWrapper";
 import AppMenu from "@/Components/AppMenu";
 import { formatRelativeTime } from "@/lib/time";
-import { AlertTriangle, Clock3, Info, SearchX } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, Info, SearchX } from "lucide-react";
 import { ConstituencySkeleton } from "@/Components/Skeletons";
 
 interface DistrictFilter {
@@ -47,6 +47,7 @@ interface ConstituencyResultResponse {
   sourceSummary: string;
   scrapedAt?: string;
   cacheUpdatedAt?: string;
+  isCompleted?: boolean;
   candidates: CandidateResult[];
 }
 
@@ -216,9 +217,21 @@ const ConstituencyPage = () => {
         ) : null}
 
         {constituencyQuery.data ? (
-          <section className="rounded-2xl border border-border bg-card/75 p-4 shadow-[0_15px_40px_-28px_rgba(0,0,0,0.85)]">
+          <section className={`rounded-2xl border p-4 ${
+            constituencyQuery.data.isCompleted
+              ? "border-emerald-500/40 bg-gradient-to-br from-emerald-500/10 via-card/80 to-card/75 shadow-[0_15px_40px_-28px_rgba(16,185,129,0.4)]"
+              : "border-border bg-card/75 shadow-[0_15px_40px_-28px_rgba(0,0,0,0.85)]"
+          }`}>
             <div className="mb-4 border-b border-border/70 pb-3">
-              <h2 className="text-lg font-semibold">{constituencyQuery.data.constituencyTitle}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">{constituencyQuery.data.constituencyTitle}</h2>
+                {constituencyQuery.data.isCompleted && (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/20 px-3 py-1 text-sm font-bold text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Result Finalized
+                  </span>
+                )}
+              </div>
               <p className="mt-1 text-xs text-muted-foreground">{constituencyQuery.data.sourceSummary}</p>
             </div>
 
@@ -233,16 +246,33 @@ const ConstituencyPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedCandidates.map((candidate) => (
-                    <tr key={`${candidate.candidateName}-${candidate.position}`} className="border-t border-border/60">
+                  {sortedCandidates.map((candidate, index) => {
+                    const isWinner = constituencyQuery.data!.isCompleted && index === 0;
+                    return (
+                    <tr
+                      key={`${candidate.candidateName}-${candidate.position}`}
+                      className={`border-t ${
+                        isWinner
+                          ? "border-emerald-500/30 bg-emerald-500/10"
+                          : "border-border/60"
+                      }`}
+                    >
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           <img
                             src={candidate.candidateAvatarUrl || candidate.candidateImage || AVATAR_FALLBACK}
                             alt={candidate.candidateName}
-                            className="h-8 w-8 rounded-full object-cover ring-1 ring-border"
+                            className={`h-8 w-8 rounded-full object-cover ring-1 ${isWinner ? "ring-2 ring-emerald-500/60" : "ring-border"}`}
                           />
-                          {candidate.candidateName}
+                          <span className={isWinner ? "font-bold text-emerald-400" : ""}>
+                            {candidate.candidateName}
+                          </span>
+                          {isWinner && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Won
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-3 py-2">
@@ -255,10 +285,11 @@ const ConstituencyPage = () => {
                           {candidate.partyName}
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-right font-semibold">{candidate.totalVotesText || candidate.totalVotes}</td>
+                      <td className={`px-3 py-2 text-right font-semibold ${isWinner ? "text-emerald-400" : ""}`}>{candidate.totalVotesText || candidate.totalVotes}</td>
                       <td className="px-3 py-2 text-right text-muted-foreground">{candidate.marginText}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

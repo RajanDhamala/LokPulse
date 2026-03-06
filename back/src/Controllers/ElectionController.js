@@ -25,6 +25,7 @@ const EvaluateCandidates = asyncHandler(async (req, res) => {
       count: snapshot.count || snapshot.candidates.length,
       lastScraped: snapshot.lastScraped,
       cacheUpdatedAt: snapshot.updatedAt || snapshot.lastScraped,
+      isCompleted: !!snapshot.isCompleted,
       candidates: sanitizePopularCandidates(snapshot.candidates || []),
     })
   );

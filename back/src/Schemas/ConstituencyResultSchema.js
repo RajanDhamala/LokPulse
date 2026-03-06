@@ -32,7 +32,8 @@ const ConstituencyResultSchema = new mongoose.Schema(
     sourceSummary: { type: String, default: "", trim: true },
     candidates: { type: [CandidateResultSchema], default: [] },
     scrapedAt: { type: Date, required: true },
-    checksum: { type: String, default: "" }
+    checksum: { type: String, default: "" },
+    isCompleted: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

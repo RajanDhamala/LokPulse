@@ -1,6 +1,7 @@
 export const sanitizePopularCandidates = (candidates = []) =>
   candidates.map((district) => ({
     districtName: district.districtName,
+    isCompleted: !!district.isCompleted,
     leaderCandidate: {
       type: district.leaderCandidate?.type,
       name: district.leaderCandidate?.name,
@@ -59,6 +60,7 @@ export const sanitizeConstituencyResult = (cached) => ({
   sourceSummary: cached.sourceSummary,
   scrapedAt: cached.scrapedAt,
   cacheUpdatedAt: cached.updatedAt || cached.scrapedAt,
+  isCompleted: !!cached.isCompleted,
   candidates: (cached.candidates || []).map((candidate) => ({
     candidateName: candidate.candidateName,
     candidateAvatarUrl: candidate.candidateAvatarUrl || candidate.candidateImage || null,
