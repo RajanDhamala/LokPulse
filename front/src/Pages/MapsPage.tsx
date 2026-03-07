@@ -158,6 +158,9 @@ interface SelectedMeta {
 const MAP_W = 1100;
 const MAP_H = 700;
 const MAP_PAD = 24;
+const MAP_ASPECT_RATIO = `${MAP_W} / ${MAP_H}`;
+const BASE_PAN_ALLOWANCE_X = MAP_W * 0.12;
+const BASE_PAN_ALLOWANCE_Y = MAP_H * 0.12;
 
 const DISTRICT_GEOJSON_URL =
   "https://raw.githubusercontent.com/mesaugat/geoJSON-Nepal/master/nepal-districts.geojson";
@@ -474,10 +477,14 @@ const MapsPage = () => {
   const dragRef = useRef<DragState | null>(null);
   const panFrameRef = useRef<number | null>(null);
   const queuedPanRef = useRef<Point | null>(null);
+  const hoverFrameRef = useRef<number | null>(null);
+  const queuedTooltipRef = useRef<TooltipData | null>(null);
+  const hoveredKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
       if (panFrameRef.current) cancelAnimationFrame(panFrameRef.current);
+      if (hoverFrameRef.current) cancelAnimationFrame(hoverFrameRef.current);
     };
   }, []);
 
@@ -591,11 +598,11 @@ const MapsPage = () => {
   /* ─── Event handlers ─── */
   const clampPan = useCallback(
     (p: Point, z: number): Point => {
-      const maxPanX = MAP_W * (z - 1);
-      const maxPanY = MAP_H * (z - 1);
+      const maxPanX = MAP_W * Math.max(z - 1, 0) + BASE_PAN_ALLOWANCE_X;
+      const maxPanY = MAP_H * Math.max(z - 1, 0) + BASE_PAN_ALLOWANCE_Y;
       return {
-        x: clamp(p.x, -maxPanX, maxPanX * 0.1),
-        y: clamp(p.y, -maxPanY, maxPanY * 0.1),
+        x: clamp(p.x, -maxPanX, maxPanX),
+        y: clamp(p.y, -maxPanY, maxPanY),
       };
     },
     []
@@ -656,13 +663,25 @@ const MapsPage = () => {
 
   /* Scroll zoom removed — zoom only via buttons */
 
+  const scheduleTooltip = useCallback((key: string, nextTooltip: TooltipData) => {
+    queuedTooltipRef.current = nextTooltip;
+    if (hoveredKeyRef.current !== key) {
+      hoveredKeyRef.current = key;
+      setHoveredKey(key);
+    }
+    if (hoverFrameRef.current) return;
+    hoverFrameRef.current = requestAnimationFrame(() => {
+      if (queuedTooltipRef.current) setTooltip(queuedTooltipRef.current);
+      hoverFrameRef.current = null;
+    });
+  }, []);
+
   const handleFeatureHover = useCallback(
     (rc: RenderedConstituency, e: ReactMouseEvent<SVGPathElement>) => {
       const svgRect =
         e.currentTarget.ownerSVGElement?.getBoundingClientRect() ??
         e.currentTarget.getBoundingClientRect();
-      setHoveredKey(rc.key);
-      setTooltip({
+      scheduleTooltip(rc.key, {
         x: clamp(e.clientX - svgRect.left + 14, 8, svgRect.width - 240),
         y: clamp(e.clientY - svgRect.top + 14, 8, svgRect.height - 120),
         districtName: rc.districtName,
@@ -673,10 +692,16 @@ const MapsPage = () => {
         status: rc.status,
       });
     },
-    []
+    [scheduleTooltip]
   );
 
   const handleFeatureLeave = useCallback(() => {
+    if (hoverFrameRef.current) {
+      cancelAnimationFrame(hoverFrameRef.current);
+      hoverFrameRef.current = null;
+    }
+    queuedTooltipRef.current = null;
+    hoveredKeyRef.current = null;
     setHoveredKey(null);
     setTooltip(null);
   }, []);
@@ -789,7 +814,11 @@ const MapsPage = () => {
                 <svg
                   className={`w-full select-none ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
                   viewBox={`0 0 ${MAP_W} ${MAP_H}`}
-                  style={{ touchAction: "none", aspectRatio: "11 / 9", minHeight: "60vh" }}
+                  style={{
+                    touchAction: "none",
+                    aspectRatio: MAP_ASPECT_RATIO,
+                    minHeight: "clamp(320px, 48vh, 560px)",
+                  }}
                   onPointerDown={handlePointerDown}
                   onPointerMove={handlePointerMove}
                   onPointerUp={handlePointerUp}

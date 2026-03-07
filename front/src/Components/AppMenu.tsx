@@ -7,7 +7,6 @@ const links = [
   { to: "/provinces", label: "Provinces" },
   { to: "/parties", label: "Parties" },
   { to: "/constituency", label: "Constituency" },
-  { to: "/constituency", label: "Constituency" },
   { to: "/maps", label: "Maps" }
 ];
 
