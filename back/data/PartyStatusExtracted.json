@@ -1,0 +1,125 @@
+{
+  "extractedAt": "2026-03-06T07:24:44.461Z",
+  "lastScraped": "2026-03-06T05:50:04.487Z",
+  "title": "Party-wise Results",
+  "count": 13,
+  "parties": [
+    {
+      "partyName": "Rastriya Swatantra Party",
+      "partyUrl": "https://election.ekantipur.com/party/7?lng=eng",
+      "partyImage": "https://assets-generalelection2082.ekantipur.com/parties/party-1770792349.png",
+      "elected": 1,
+      "electedText": "1",
+      "leading": 47,
+      "leadingText": "47"
+    },
+    {
+      "partyName": "CPN-UML",
+      "partyUrl": "https://election.ekantipur.com/party/1?lng=eng",
+      "partyImage": "https://assets-generalelection2082.ekantipur.com/parties/party-1770710534.png",
+      "elected": 0,
+      "electedText": "0",
+      "leading": 5,
+      "leadingText": "5"
+    },
+    {
+      "partyName": "Nepali Congress",
+      "partyUrl": "https://election.ekantipur.com/party/2?lng=eng",
+      "partyImage": "https://assets-generalelection2082.ekantipur.com/parties/party-1770710566.png",
+      "elected": 0,
+      "electedText": "0",
+      "leading": 5,
+      "leadingText": "5"
+    },
+    {
+      "partyName": "Nepali Communist Party",
+      "partyUrl": "https://election.ekantipur.com/party/9?lng=eng",
+      "partyImage": "https://assets-generalelection2082.ekantipur.com/parties/party-1770793102.png",
+      "elected": 0,
+      "electedText": "0",
+      "leading": 3,
+      "leadingText": "3"
+    },
+    {
+      "partyName": "Rastriya Prajatantra Party",
+      "partyUrl": "https://election.ekantipur.com/party/3?lng=eng",
+      "partyImage": "https://assets-generalelection2082.ekantipur.com/parties/party-1770793829.png",
+      "elected": 0,
+      "electedText": "0",
+      "leading": 1,
+      "leadingText": "1"
+    },
+    {
+      "partyName": "Shram Sanskriti Party",
+      "partyUrl": "https://election.ekantipur.com/party/11?lng=eng",
+      "partyImage": "https://assets-generalelection2082.ekantipur.com/parties/party-1770793904.png",
+      "elected": 0,
+      "electedText": "0",
+      "leading": 1,
+      "leadingText": "1"
+    },
+    {
+      "partyName": "Janata Samjbadi Party-Nepal",
+      "partyUrl": "https://election.ekantipur.com/party/6?lng=eng",
+      "partyImage": "https://assets-generalelection2082.ekantipur.com/parties/party-1770792403.png",
+      "elected": 0,
+      "electedText": "0",
+      "leading": 0,
+      "leadingText": "0"
+    },
+    {
+      "partyName": "Nepal Communist Party (Maoist)",
+      "partyUrl": "https://election.ekantipur.com/party/12?lng=eng",
+      "partyImage": "https://assets-generalelection2082.ekantipur.com/parties/party-1770797745.png",
+      "elected": 0,
+      "electedText": "0",
+      "leading": 0,
+      "leadingText": "0"
+    },
+    {
+      "partyName": "Ujaylo Nepal Party",
+      "partyUrl": "https://election.ekantipur.com/party/13?lng=eng",
+      "partyImage": "https://assets-generalelection2082.ekantipur.com/parties/party-1770794244.png",
+      "elected": 0,
+      "electedText": "0",
+      "leading": 0,
+      "leadingText": "0"
+    },
+    {
+      "partyName": "Rastriya Mukti Party Nepal (Ekal Chunab Chinha)",
+      "partyUrl": "https://election.ekantipur.com/party/17?lng=eng",
+      "partyImage": "https://assets-generalelection2082.ekantipur.com/parties/party-1772011143.jpg",
+      "elected": 0,
+      "electedText": "0",
+      "leading": 0,
+      "leadingText": "0"
+    },
+    {
+      "partyName": "Janamat Party",
+      "partyUrl": "https://election.ekantipur.com/party/22?lng=eng",
+      "partyImage": "https://assets-generalelection2082.ekantipur.com/parties/party-1770792211.png",
+      "elected": 0,
+      "electedText": "0",
+      "leading": 0,
+      "leadingText": "0"
+    },
+    {
+      "partyName": "Nagarik Unmukti Party",
+      "partyUrl": "https://election.ekantipur.com/party/36?lng=eng",
+      "partyImage": "https://assets-generalelection2082.ekantipur.com/parties/party-1772012045.jpg",
+      "elected": 0,
+      "electedText": "0",
+      "leading": 0,
+      "leadingText": "0"
+    },
+    {
+      "partyName": "Others",
+      "partyUrl": "https://election.ekantipur.com/party/99?lng=eng",
+      "partyImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8Xw8AAoMBgDTD2qgAAAAASUVORK5CYII=",
+      "elected": 0,
+      "electedText": "0",
+      "leading": 0,
+      "leadingText": "0"
+    }
+  ]
+}

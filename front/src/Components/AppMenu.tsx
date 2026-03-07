@@ -6,7 +6,12 @@ const links = [
   { to: "/popular", label: "Popular" },
   { to: "/provinces", label: "Provinces" },
   { to: "/parties", label: "Parties" },
+<<<<<<< HEAD
   { to: "/constituency", label: "Constituency" }
+=======
+  { to: "/constituency", label: "Constituency" },
+  { to: "/maps", label: "Maps" }
+>>>>>>> 689fffd (adding live map dashboard)
 ];
 
 const AppMenu = () => {

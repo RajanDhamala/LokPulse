@@ -1,0 +1,21 @@
+{
+  "name": "election-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Local scraping and DB update scripts for election data. Never deployed to production.",
+  "scripts": {
+    "scrape:homepage": "node scrapeHomepage.js",
+    "scrape:popular": "node scrapePopularCandidates.js",
+    "scrape:constituencies": "node crawlConstituencies.js",
+    "scrape:full": "node fullRefresh.js",
+    "db:update": "node updateRecord.js",
+    "scrape:auto": "node autoRefresh.js"
+  },
+  "dependencies": {
+    "axios": "^1.13.6",
+    "cheerio": "^1.2.0",
+    "dotenv": "^17.2.3",
+    "mongoose": "^8.19.0"
+  }
+}

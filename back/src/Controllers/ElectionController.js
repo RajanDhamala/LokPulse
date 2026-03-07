@@ -65,6 +65,44 @@ const GetPartyStatus = asyncHandler(async (req, res) => {
   );
 });
 
+<<<<<<< HEAD
+=======
+const GetMapSummary = asyncHandler(async (req, res) => {
+  const constituencies = await ConstituencyResult.aggregate([
+    {
+      $project: {
+        _id: 0,
+        provinceId: 1,
+        districtSlug: 1,
+        districtName: 1,
+        constituencyNo: 1,
+        isCompleted: { $ifNull: ["$isCompleted", false] },
+        candidates: {
+          $map: {
+            input: { $slice: [{ $sortArray: { input: "$candidates", sortBy: { totalVotes: -1 } } }, 3] },
+            as: "c",
+            in: {
+              candidateName: "$$c.candidateName",
+              partyName: "$$c.partyName",
+              partyImage: { $ifNull: ["$$c.partyImage", { $ifNull: ["$$c.partyAvatarUrl", null] }] },
+              candidateImage: { $ifNull: ["$$c.candidateImage", { $ifNull: ["$$c.candidateAvatarUrl", null] }] },
+              totalVotes: { $ifNull: ["$$c.totalVotes", 0] },
+            },
+          },
+        },
+      },
+    },
+  ]);
+
+  return res.send(
+    new ApiResponse(200, "Map summary loaded", {
+      count: constituencies.length,
+      constituencies,
+    })
+  );
+});
+
+>>>>>>> 689fffd (adding live map dashboard)
 const GetLocationFilters = asyncHandler(async (req, res) => {
   const locations = await LocationIndex.find()
     .sort({ provinceId: 1, districtSlug: 1, constituencyNo: 1 })
@@ -152,6 +190,10 @@ export {
   EvaluateCandidates,
   GetProvincesStaus,
   GetPartyStatus,
+<<<<<<< HEAD
+=======
+  GetMapSummary,
+>>>>>>> 689fffd (adding live map dashboard)
   GetLocationFilters,
   GetConstituencyResult,
 };
