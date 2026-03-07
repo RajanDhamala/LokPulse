@@ -6,10 +6,7 @@ import {
   LazyProvincesPage,
   LazyPartiesPage,
   LazyConstituencyPage,
-<<<<<<< HEAD
-=======
   LazyMaps,
->>>>>>> 689fffd (adding live map dashboard)
   LazyNotFoundPage,
 } from "./LazyLoading/LazyLoading";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
@@ -30,10 +27,7 @@ function App() {
             <Route path="/provinces" element={<LazyProvincesPage />} />
             <Route path="/parties" element={<LazyPartiesPage />} />
             <Route path="/constituency" element={<LazyConstituencyPage />} />
-<<<<<<< HEAD
-=======
             <Route path="/maps" element={<LazyMaps />} />
->>>>>>> 689fffd (adding live map dashboard)
             <Route path="*" element={<LazyNotFoundPage />} />
           </Routes>
         </Suspense>

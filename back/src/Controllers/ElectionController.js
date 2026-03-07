@@ -65,8 +65,6 @@ const GetPartyStatus = asyncHandler(async (req, res) => {
   );
 });
 
-<<<<<<< HEAD
-=======
 const GetMapSummary = asyncHandler(async (req, res) => {
   const constituencies = await ConstituencyResult.aggregate([
     {
@@ -102,7 +100,6 @@ const GetMapSummary = asyncHandler(async (req, res) => {
   );
 });
 
->>>>>>> 689fffd (adding live map dashboard)
 const GetLocationFilters = asyncHandler(async (req, res) => {
   const locations = await LocationIndex.find()
     .sort({ provinceId: 1, districtSlug: 1, constituencyNo: 1 })
@@ -190,10 +187,7 @@ export {
   EvaluateCandidates,
   GetProvincesStaus,
   GetPartyStatus,
-<<<<<<< HEAD
-=======
   GetMapSummary,
->>>>>>> 689fffd (adding live map dashboard)
   GetLocationFilters,
   GetConstituencyResult,
 };

@@ -3,10 +3,7 @@ import {
   EvaluateCandidates,
   GetProvincesStaus,
   GetPartyStatus,
-<<<<<<< HEAD
-=======
   GetMapSummary,
->>>>>>> 689fffd (adding live map dashboard)
   GetLocationFilters,
   GetConstituencyResult,
 } from "../Controllers/ElectionController.js";
@@ -21,10 +18,7 @@ ElectionRouter.get("/eval", EvaluateCandidates);
 ElectionRouter.get("/status", GetProvincesStaus);
 ElectionRouter.get("/party-status", GetPartyStatus);
 ElectionRouter.get("/filters", GetLocationFilters);
-<<<<<<< HEAD
-=======
 ElectionRouter.get("/map-summary", GetMapSummary);
->>>>>>> 689fffd (adding live map dashboard)
 ElectionRouter.get("/constituency", GetConstituencyResult);
 
 export default ElectionRouter;
