@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 
@@ -13,6 +13,50 @@ const links = [
 const AppMenu = () => {
   const [open, setOpen] = useState(false);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const scrollY = window.scrollY;
+    const bodyStyle = document.body.style;
+    const htmlStyle = document.documentElement.style;
+
+    const previous = {
+      bodyPosition: bodyStyle.position,
+      bodyTop: bodyStyle.top,
+      bodyLeft: bodyStyle.left,
+      bodyRight: bodyStyle.right,
+      bodyWidth: bodyStyle.width,
+      bodyOverflow: bodyStyle.overflow,
+      bodyTouchAction: bodyStyle.touchAction,
+      htmlOverflow: htmlStyle.overflow,
+      htmlOverscrollBehavior: htmlStyle.overscrollBehavior
+    };
+
+    // Lock document scrolling while the mobile drawer is open.
+    bodyStyle.position = "fixed";
+    bodyStyle.top = `-${scrollY}px`;
+    bodyStyle.left = "0";
+    bodyStyle.right = "0";
+    bodyStyle.width = "100%";
+    bodyStyle.overflow = "hidden";
+    bodyStyle.touchAction = "none";
+    htmlStyle.overflow = "hidden";
+    htmlStyle.overscrollBehavior = "none";
+
+    return () => {
+      bodyStyle.position = previous.bodyPosition;
+      bodyStyle.top = previous.bodyTop;
+      bodyStyle.left = previous.bodyLeft;
+      bodyStyle.right = previous.bodyRight;
+      bodyStyle.width = previous.bodyWidth;
+      bodyStyle.overflow = previous.bodyOverflow;
+      bodyStyle.touchAction = previous.bodyTouchAction;
+      htmlStyle.overflow = previous.htmlOverflow;
+      htmlStyle.overscrollBehavior = previous.htmlOverscrollBehavior;
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+
   return (
     <>
       <button
@@ -25,7 +69,10 @@ const AppMenu = () => {
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-40 bg-black/45" onClick={() => setOpen(false)}>
+        <div
+          className="fixed inset-0 z-40 bg-black/45"
+          onClick={() => setOpen(false)}
+        >
           <aside
             className="h-full w-64 border-r border-border/70 bg-background/95 p-4"
             onClick={(event) => event.stopPropagation()}

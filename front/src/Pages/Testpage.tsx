@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/Utils/AxiosWrapper";
 import { AlertTriangle, CheckCircle2, Clock3, SearchX, Star } from "lucide-react";
@@ -44,18 +44,71 @@ const formatVoteChange = (value?: string) => {
   return value.startsWith("+") ? value : `+${value}`;
 };
 
+const hasMeaningfulValue = (value?: string) => Boolean(value?.trim());
+
+const normalizeDistrictLeaderVoteChange = (district: DistrictCandidates): DistrictCandidates => {
+  if (hasMeaningfulValue(district.leaderCandidate.voteChange)) {
+    return district;
+  }
+
+  const sideVoteChange = district.sideCandidates.find((candidate) => hasMeaningfulValue(candidate.voteChange))?.voteChange?.trim();
+  if (!sideVoteChange) {
+    return district;
+  }
+
+  return {
+    ...district,
+    leaderCandidate: {
+      ...district.leaderCandidate,
+      voteChange: sideVoteChange,
+    },
+  };
+};
+
+const buildFilteredDistricts = ({
+  districts,
+  query,
+  favoriteSet,
+}: {
+  districts: DistrictCandidates[];
+  query: string;
+  favoriteSet: Set<string>;
+}) => {
+  const matchedDistricts = !query
+    ? districts
+    : districts.filter((district) => {
+      const searchable = [
+        district.districtName,
+        district.leaderCandidate?.name,
+        district.leaderCandidate?.partyName,
+        ...(district.sideCandidates || []).flatMap((candidate) => [candidate.name, candidate.partyName]),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchable.includes(query);
+    });
+
+  return matchedDistricts
+    .map((district, index) => ({
+      district,
+      index,
+      favoriteScore: favoriteSet.has(district.districtName) ? 1 : 0,
+    }))
+    .sort((a, b) => b.favoriteScore - a.favoriteScore || a.index - b.index)
+    .map((item) => item.district);
+};
+
 const LeaderCard = ({ candidate, isCompleted }: { candidate: Candidate; isCompleted?: boolean }) => (
-  <div className={`relative overflow-hidden rounded-2xl border p-4 shadow-[0_20px_45px_-30px_rgba(0,0,0,0.95)] ${
-    isCompleted
-      ? "border-emerald-500/40 bg-gradient-to-b from-emerald-500/20 via-card/90 to-card/90"
-      : "border-primary/20 bg-gradient-to-b from-primary/15 via-card/90 to-card/90"
-  }`}>
-    <div className={`pointer-events-none absolute right-[-42px] top-[-42px] h-28 w-28 rounded-full blur-2xl ${
-      isCompleted ? "bg-emerald-500/20" : "bg-primary/15"
-    }`} />
-    <p className={`mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] ${
-      isCompleted ? "text-emerald-400" : "text-primary/80"
+  <div className={`relative overflow-hidden rounded-2xl border p-4 shadow-[0_20px_45px_-30px_rgba(0,0,0,0.95)] ${isCompleted
+    ? "border-emerald-500/40 bg-gradient-to-b from-emerald-500/20 via-card/90 to-card/90"
+    : "border-primary/20 bg-gradient-to-b from-primary/15 via-card/90 to-card/90"
     }`}>
+    <div className={`pointer-events-none absolute right-[-42px] top-[-42px] h-28 w-28 rounded-full blur-2xl ${isCompleted ? "bg-emerald-500/20" : "bg-primary/15"
+      }`} />
+    <p className={`mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] ${isCompleted ? "text-emerald-400" : "text-primary/80"
+      }`}>
       {isCompleted ? "✓ Winner" : "Leading candidate"}
     </p>
     <div className="flex items-start gap-3">
@@ -109,7 +162,6 @@ const CandidateRow = ({ candidate }: { candidate: Candidate }) => (
     </div>
     <div className="text-right">
       <p className="text-sm font-bold text-foreground">{candidate.votes || "0"}</p>
-      {candidate.voteChange ? <p className="text-[11px] text-emerald-400">{formatVoteChange(candidate.voteChange)}</p> : null}
     </div>
   </div>
 );
@@ -118,6 +170,9 @@ const TestPage = () => {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [favoriteDistricts, setFavoriteDistricts] = useState<string[]>([]);
+  const [processedDistricts, setProcessedDistricts] = useState<DistrictCandidates[]>([]);
+  const [hasProcessedData, setHasProcessedData] = useState(false);
+  const [isFiltering, startFilteringTransition] = useTransition();
   const { data, isLoading, isError, error } = useQuery<PopularCandidatesResponse>({
     queryKey: ["popular-candidates"],
     queryFn: () => api.get("/elections/eval"),
@@ -156,38 +211,37 @@ const TestPage = () => {
   };
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
-  const filteredDistricts = useMemo(() => {
+  const deferredNormalizedQuery = useDeferredValue(normalizedQuery);
+  const normalizedDistricts = useMemo(() => {
     if (!data?.candidates?.length) return [];
-    const candidates = !normalizedQuery
-      ? data.candidates
-      : data.candidates.filter((district) => {
-        const searchable = [
-          district.districtName,
-          district.leaderCandidate?.name,
-          district.leaderCandidate?.partyName,
-          ...(district.sideCandidates || []).flatMap((candidate) => [candidate.name, candidate.partyName]),
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
+    return data.candidates.map(normalizeDistrictLeaderVoteChange);
+  }, [data?.candidates]);
 
-        return searchable.includes(normalizedQuery);
+  useEffect(() => {
+    if (!data?.candidates) {
+      setProcessedDistricts([]);
+      setHasProcessedData(false);
+      return;
+    }
+
+    setHasProcessedData(false);
+    startFilteringTransition(() => {
+      const nextDistricts = buildFilteredDistricts({
+        districts: normalizedDistricts,
+        query: deferredNormalizedQuery,
+        favoriteSet,
       });
+      setProcessedDistricts(nextDistricts);
+      setHasProcessedData(true);
+    });
+  }, [data?.candidates, normalizedDistricts, deferredNormalizedQuery, favoriteSet]);
 
-    return candidates
-      .map((district, index) => ({
-        district,
-        index,
-        favoriteScore: favoriteSet.has(district.districtName) ? 1 : 0,
-      }))
-      .sort((a, b) => b.favoriteScore - a.favoriteScore || a.index - b.index)
-      .map((item) => item.district);
-  }, [data?.candidates, normalizedQuery, favoriteSet]);
+  const shouldShowProcessingSkeleton = isLoading || (Boolean(data?.candidates) && (!hasProcessedData || isFiltering));
 
   return (
-    <main className="dark min-h-screen bg-background text-foreground">
+    <main className="dark min-h-screen overflow-x-hidden bg-background text-foreground">
       <AppMenu />
-      <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 md:px-8">
+      <div className="mx-auto w-full max-w-6xl space-y-6 overflow-x-hidden px-4 py-8 md:px-8">
         <header className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -218,12 +272,12 @@ const TestPage = () => {
               className="w-full rounded-xl border border-border bg-background/80 px-3 py-2 text-sm outline-none ring-0 transition placeholder:text-muted-foreground focus:border-primary"
             />
             <p className="text-xs text-muted-foreground">
-              Showing {filteredDistricts.length} of {data?.count || 0} districts
+              Showing {processedDistricts.length} of {data?.count || 0} districts
             </p>
           </div>
         </header>
 
-        {isLoading ? <PopularSkeleton /> : null}
+        {shouldShowProcessingSkeleton ? <PopularSkeleton /> : null}
 
         {isError ? (
           <section className="rounded-2xl border border-destructive/40 bg-destructive/10 p-6 text-destructive">
@@ -239,20 +293,19 @@ const TestPage = () => {
           </section>
         ) : null}
 
-        {!isLoading && !isError && filteredDistricts.length ? (
+        {!shouldShowProcessingSkeleton && !isError && processedDistricts.length ? (
           <section className="space-y-4">
-            {filteredDistricts.map((district) => (
+            {processedDistricts.map((district) => (
               <article
                 key={`${district.districtName}-${district.districtUrl || "no-url"}`}
-                className={`rounded-2xl border p-4 ${
-                  district.isCompleted
-                    ? "border-emerald-500/40 bg-gradient-to-br from-emerald-500/10 via-card/80 to-card/75 shadow-[0_15px_40px_-28px_rgba(16,185,129,0.4)]"
-                    : "border-border bg-card/75 shadow-[0_15px_40px_-28px_rgba(0,0,0,0.85)]"
-                }`}
+                className={`rounded-2xl border p-4 ${district.isCompleted
+                  ? "border-emerald-500/40 bg-gradient-to-br from-emerald-500/10 via-card/80 to-card/75 shadow-[0_15px_40px_-28px_rgba(16,185,129,0.4)]"
+                  : "border-border bg-card/75 shadow-[0_15px_40px_-28px_rgba(0,0,0,0.85)]"
+                  }`}
               >
-                <div className="mb-4 flex items-center justify-between gap-3 border-b border-border/70 pb-3">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold">{district.districtName}</h2>
+                <div className="mb-4 flex items-start justify-between gap-3 border-b border-border/70 pb-3">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <h2 className="min-w-0 break-words text-lg font-semibold">{district.districtName}</h2>
                     {district.isCompleted && (
                       <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/20 px-3 py-1 text-sm font-bold text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
                         <CheckCircle2 className="h-4 w-4" />
@@ -267,8 +320,8 @@ const TestPage = () => {
                       aria-label={favoriteSet.has(district.districtName) ? "Remove favorite district" : "Add favorite district"}
                       title={favoriteSet.has(district.districtName) ? "Favorited district" : "Mark district as favorite"}
                       className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${favoriteSet.has(district.districtName)
-                          ? "border-amber-400/50 bg-amber-400/15 text-amber-300 hover:bg-amber-400/20"
-                          : "border-border/70 bg-background/70 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        ? "border-amber-400/50 bg-amber-400/15 text-amber-300 hover:bg-amber-400/20"
+                        : "border-border/70 bg-background/70 text-muted-foreground hover:bg-muted hover:text-foreground"
                         }`}
                     >
                       <Star
@@ -299,13 +352,15 @@ const TestPage = () => {
           </section>
         ) : null}
 
-        {!isLoading && !isError && !filteredDistricts.length ? (
+        {!shouldShowProcessingSkeleton && !isError && !processedDistricts.length ? (
           <section className="rounded-2xl border border-border bg-card/80 p-6 text-muted-foreground">
             <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
               <SearchX className="h-4 w-4" />
               No matching districts
             </p>
-            <p className="mt-2 text-sm">No districts matched "{searchInput}". Try another district, candidate, or party keyword.</p>
+            <p className="mt-2 break-words text-sm">
+              No districts matched "<span className="break-all">{searchInput}</span>". Try another district, candidate, or party keyword.
+            </p>
           </section>
         ) : null}
       </div>
