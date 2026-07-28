@@ -34,11 +34,21 @@ Data scripts ──write──▶ MongoDB ◀──read── Express API ◀─
 | API | `apps/api` | Read-only Express 5 API with Mongoose, Helmet, CORS, and rate limiting. |
 | Data pipeline | Private local `scripts` workspace | Collects and refreshes election records outside the deployed application. Its source is not published. |
 
+### Final-results cache
+
+During active counting or development, summary endpoints read the latest values from MongoDB. After an election is complete, the API can keep the stable summaries in process memory:
+
+```env
+ELECTION_RESULTS_FINAL=true
+```
+
+In final-results mode, the first request loads each summary from MongoDB and later requests reuse that sanitized value for the lifetime of the API process. Popular candidates, province status, party status, location filters, and the winner-only map summary use this bounded cache. Constituency detail remains database-backed because it has many possible query keys.
+
+The cache is rebuilt from MongoDB after every restart. No election results are hardcoded, written to a generated cache file. A separate shared cache such as Redis is unnecessary for this small, fixed set of summaries.
+
 ## Using LokPulse
 
-LokPulse is intended to be used through its hosted web application. Visitors can explore the published election results without installing the project, configuring MongoDB, or running the data pipeline.
-
-The repository contains the web and API application code used for deployment, but it does not distribute the MongoDB dataset or the private ingestion source required to recreate the complete backend. It is therefore not presented as a self-contained election-data package.
+The repository contains the web and API application code used for deployment.
 
 ## Private data operations
 

@@ -2,7 +2,8 @@
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/Utils/AxiosWrapper";
-import { AlertTriangle, CheckCircle2, Clock3, SearchX, Star } from "lucide-react";
+import { CheckCircle2, Clock3, SearchX, Star } from "lucide-react";
+import DataLoadError from "@/Components/DataLoadError";
 import { FINAL_RESULTS_PUBLISHED_LABEL } from "@/lib/time";
 import { PopularSkeleton } from "@/Components/Skeletons";
 
@@ -184,9 +185,9 @@ const TestPage = () => {
   const [processedDistricts, setProcessedDistricts] = useState<DistrictCandidates[]>([]);
   const [hasProcessedData, setHasProcessedData] = useState(false);
   const [isFiltering, startFilteringTransition] = useTransition();
-  const { data, isLoading, isError, error } = useQuery<PopularCandidatesResponse>({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery<PopularCandidatesResponse>({
     queryKey: ["popular-candidates"],
-    queryFn: () => api.get("/elections/eval"),
+    queryFn: () => api.get("/elections/eval", { showErrorToast: false }),
     staleTime: Infinity,
   });
 
@@ -296,17 +297,11 @@ const TestPage = () => {
         {shouldShowProcessingSkeleton ? <PopularSkeleton /> : null}
 
         {isError ? (
-          <section className="rounded-xl border border-destructive/40 bg-destructive/10 p-6 text-destructive">
-            <p className="inline-flex items-center gap-2 text-sm font-semibold">
-              <AlertTriangle className="h-4 w-4" />
-              Unable to load popular candidates
-            </p>
-            <p className="mt-2 text-sm">
-              {String((error as { message?: string })?.message || "").includes("Result not found in cache")
-                ? "Result not found. Contact the developer."
-                : String((error as { message?: string })?.message || "Unknown error")}
-            </p>
-          </section>
+          <DataLoadError
+            title="Popular candidate results are temporarily unavailable"
+            onRetry={() => void refetch()}
+            isRetrying={isFetching}
+          />
         ) : null}
 
         {!shouldShowProcessingSkeleton && !isError && processedDistricts.length ? (

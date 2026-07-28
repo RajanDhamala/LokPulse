@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/Utils/AxiosWrapper";
+import DataLoadError from "@/Components/DataLoadError";
 import {
   CheckCircle2,
   ChevronLeft,
@@ -78,12 +79,10 @@ interface TooltipPointer {
   svg: SVGSVGElement;
 }
 
-// API types — map summary (bulk, lightweight)
-interface MapCandidateSummary {
-  candidateName: string;
+// API types — map summary (winner only)
+interface MapWinnerSummary {
   partyName: string;
   partyImage: string | null;
-  candidateImage: string | null;
   totalVotes: number;
 }
 
@@ -93,7 +92,7 @@ interface MapConstituency {
   districtName: string;
   constituencyNo: number;
   isCompleted: boolean;
-  candidates: MapCandidateSummary[];
+  winner: MapWinnerSummary | null;
 }
 
 interface MapSummaryResponse {
@@ -328,8 +327,7 @@ const getPartyColor = (name: string): string => {
 const getStatus = (s: MapConstituency | undefined): ConstituencyStatus => {
   if (!s) return "no-data";
   if (s.isCompleted) return "completed";
-  const total = s.candidates.reduce((sum, c) => sum + c.totalVotes, 0);
-  return total === 0 ? "not-started" : "counting";
+  return (s.winner?.totalVotes ?? 0) === 0 ? "not-started" : "counting";
 };
 
 /* ─── Geo helpers ─── */
@@ -625,12 +623,13 @@ const MapsPage = () => {
   const [constGeo, setConstGeo] = useState<GeoFeatureCollection | null>(null);
   const [countryGeo, setCountryGeo] = useState<GeoFeatureCollection | null>(null);
   const [geoLoading, setGeoLoading] = useState(true);
-  const [geoError, setGeoError] = useState<string | null>(null);
+  const [geoError, setGeoError] = useState(false);
+  const [geoReloadKey, setGeoReloadKey] = useState(0);
 
   useEffect(() => {
     const ctrl = new AbortController();
     setGeoLoading(true);
-    setGeoError(null);
+    setGeoError(false);
 
     Promise.all([
       fetchGeoJson(CONSTITUENCY_GEOJSON_URL, ctrl.signal),
@@ -643,17 +642,20 @@ const MapsPage = () => {
       })
       .catch((e) => {
         if (e instanceof DOMException && e.name === "AbortError") return;
-        setGeoError(e instanceof Error ? e.message : "Unable to load map data");
+        setGeoError(true);
         setGeoLoading(false);
       });
 
     return () => ctrl.abort();
-  }, []);
+  }, [geoReloadKey]);
 
   /* ─── API queries ─── */
   const summaryQuery = useQuery<MapSummaryResponse>({
     queryKey: ["map-summary"],
-    queryFn: () => api.get("/elections/map-summary") as Promise<MapSummaryResponse>,
+    queryFn: () =>
+      api.get("/elections/map-summary", {
+        showErrorToast: false,
+      }) as Promise<MapSummaryResponse>,
     staleTime: Infinity,
     gcTime: 60 * 60_000,
   });
@@ -669,7 +671,8 @@ const MapsPage = () => {
     ],
     queryFn: () =>
       api.get(
-        `/elections/constituency?provinceId=${selected!.provinceId}&district=${selected!.districtSlug}&constituencyNo=${selected!.constituencyNo}`
+        `/elections/constituency?provinceId=${selected!.provinceId}&district=${selected!.districtSlug}&constituencyNo=${selected!.constituencyNo}`,
+        { showErrorToast: false }
       ) as Promise<ConstituencyDetailResponse>,
     enabled: !!selected,
     staleTime: Infinity,
@@ -769,13 +772,13 @@ const MapsPage = () => {
   const rendered = useMemo<RenderedConstituency[]>(() => {
     return constituencyGeometry.map((geometry) => {
       const summary = summaryLookup.get(geometry.key);
-      const leading = summary?.candidates?.[0];
+      const winner = summary?.winner;
       const status = getStatus(summary);
       const fillColor =
         status === "no-data"
           ? NO_DATA_COLOR
-          : leading
-            ? getPartyColor(leading.partyName)
+          : winner
+            ? getPartyColor(winner.partyName)
             : FALLBACK_COLOR;
 
       return {
@@ -806,9 +809,9 @@ const MapsPage = () => {
       { color: string; image: string | null; count: number; elected: number }
     >();
     for (const rc of rendered) {
-      const leading = rc.summary?.candidates?.[0];
-      if (!leading) continue;
-      const name = leading.partyName;
+      const winner = rc.summary?.winner;
+      if (!winner) continue;
+      const name = winner.partyName;
       const existing = counts.get(name);
       if (existing) {
         existing.count++;
@@ -816,7 +819,7 @@ const MapsPage = () => {
       } else {
         counts.set(name, {
           color: rc.fillColor,
-          image: leading.partyImage,
+          image: winner.partyImage,
           count: 1,
           elected: rc.status === "completed" ? 1 : 0,
         });
@@ -993,8 +996,8 @@ const MapsPage = () => {
         districtName: rc.districtName,
         constituencyNo: rc.constituencyNo,
         provinceId: rc.provinceId,
-        leadingParty: rc.summary?.candidates?.[0]?.partyName ?? null,
-        leadingVotes: rc.summary?.candidates?.[0]?.totalVotes ?? 0,
+        leadingParty: rc.summary?.winner?.partyName ?? null,
+        leadingVotes: rc.summary?.winner?.totalVotes ?? 0,
         status: rc.status,
       });
     },
@@ -1135,9 +1138,9 @@ const MapsPage = () => {
   );
 
   const partyLogoShapes = useMemo(() => {
-    if (!showAvatars || zoom < 2.5) return null;
+    if (!showAvatars) return null;
     return rendered.map((rc) => {
-      const img = rc.summary?.candidates?.[0]?.partyImage;
+      const img = rc.summary?.winner?.partyImage;
       if (!rc.centroid || !img) return null;
       const size = Math.max(6, 10 / zoom);
       return (
@@ -1208,13 +1211,23 @@ const MapsPage = () => {
         )}
 
         {geoError && (
-          <section className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-            {geoError}
-          </section>
+          <DataLoadError
+            title="The election map is temporarily unavailable"
+            onRetry={() => setGeoReloadKey((current) => current + 1)}
+            isRetrying={geoLoading}
+          />
+        )}
+
+        {!geoError && summaryQuery.isError && (
+          <DataLoadError
+            title="Map results are temporarily unavailable"
+            onRetry={() => void summaryQuery.refetch()}
+            isRetrying={summaryQuery.isFetching}
+          />
         )}
 
         {/* ── Map + Sidebar ── */}
-        {!geoLoading && !geoError && (
+        {!geoLoading && !geoError && !summaryQuery.isError && (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
             {/* ── Map Panel ── */}
             <div className="min-w-0 space-y-3">
@@ -1459,9 +1472,12 @@ const MapsPage = () => {
                     )}
 
                     {detailQuery.isError && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive">
-                        Failed to load
-                      </span>
+                      <DataLoadError
+                        compact
+                        title="Constituency details are temporarily unavailable"
+                        onRetry={() => void detailQuery.refetch()}
+                        isRetrying={detailQuery.isFetching}
+                      />
                     )}
 
                     {detailQuery.data && (

@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/Utils/AxiosWrapper";
 import { FINAL_RESULTS_PUBLISHED_LABEL } from "@/lib/time";
-import { AlertTriangle, CheckCircle2, Clock3, Info, SearchX } from "lucide-react";
+import { CheckCircle2, Clock3, Info, SearchX } from "lucide-react";
+import DataLoadError from "@/Components/DataLoadError";
 import { ConstituencySkeleton } from "@/Components/Skeletons";
 
 interface DistrictFilter {
@@ -65,7 +66,7 @@ const ConstituencyPage = () => {
 
   const filtersQuery = useQuery<FiltersResponse>({
     queryKey: ["election-filters"],
-    queryFn: () => api.get("/elections/filters"),
+    queryFn: () => api.get("/elections/filters", { showErrorToast: false }),
     staleTime: Infinity
   });
 
@@ -83,7 +84,8 @@ const ConstituencyPage = () => {
     queryKey: ["constituency-result", provinceId, districtSlug, constituencyNo],
     queryFn: () =>
       api.get(
-        `/elections/constituency?provinceId=${provinceId}&district=${districtSlug}&constituencyNo=${constituencyNo}&lang=eng`
+        `/elections/constituency?provinceId=${provinceId}&district=${districtSlug}&constituencyNo=${constituencyNo}&lang=eng`,
+        { showErrorToast: false }
       ),
     enabled: Boolean(provinceId && districtSlug && constituencyNo),
     staleTime: Infinity
@@ -187,33 +189,21 @@ const ConstituencyPage = () => {
         {filtersQuery.isLoading ? <ConstituencySkeleton /> : null}
 
         {filtersQuery.isError ? (
-          <section className="rounded-xl border border-destructive/40 bg-destructive/10 p-6 text-destructive">
-            <p className="inline-flex items-center gap-2 text-sm font-semibold">
-              <AlertTriangle className="h-4 w-4" />
-              Unable to load constituency filters
-            </p>
-            <p className="mt-2 text-sm">
-              {String((filtersQuery.error as { message?: string })?.message || "").includes("Result not found in cache")
-                ? "Result not found. Contact the developer."
-                : String((filtersQuery.error as { message?: string })?.message || "Unknown error")}
-            </p>
-          </section>
+          <DataLoadError
+            title="Constituency choices are temporarily unavailable"
+            onRetry={() => void filtersQuery.refetch()}
+            isRetrying={filtersQuery.isFetching}
+          />
         ) : null}
 
         {constituencyQuery.isLoading ? <ConstituencySkeleton /> : null}
 
         {constituencyQuery.isError ? (
-          <section className="rounded-xl border border-destructive/40 bg-destructive/10 p-6 text-destructive">
-            <p className="inline-flex items-center gap-2 text-sm font-semibold">
-              <AlertTriangle className="h-4 w-4" />
-              Unable to load constituency result
-            </p>
-            <p className="mt-2 text-sm">
-              {String((constituencyQuery.error as { message?: string })?.message || "").includes("Result not found in cache")
-                ? "Result not found. Contact the developer."
-                : String((constituencyQuery.error as { message?: string })?.message || "Unknown error")}
-            </p>
-          </section>
+          <DataLoadError
+            title="This constituency result is temporarily unavailable"
+            onRetry={() => void constituencyQuery.refetch()}
+            isRetrying={constituencyQuery.isFetching}
+          />
         ) : null}
 
         {!filtersQuery.isLoading && !filtersQuery.isError && (!provinceId || !districtSlug || !constituencyNo) ? (
@@ -372,9 +362,12 @@ const ConstituencyPage = () => {
           <section className="rounded-xl border border-border bg-card p-6 text-muted-foreground shadow-sm">
             <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
               <SearchX className="h-4 w-4" />
-              No cached result for selection
+              Result unavailable for this selection
             </p>
-            <p className="mt-2 text-sm">No result found in cache for this constituency. Contact the developer/admin to refresh data.</p>
+            <p className="mt-2 text-sm">
+              This constituency result is not available right now. Please check the selection or
+              visit again shortly.
+            </p>
           </section>
         ) : null}
       </div>

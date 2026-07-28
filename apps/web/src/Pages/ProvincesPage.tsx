@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/Utils/AxiosWrapper";
 import { FINAL_RESULTS_PUBLISHED_LABEL } from "@/lib/time";
-import { AlertTriangle, Clock3, SearchX } from "lucide-react";
+import { Clock3, SearchX } from "lucide-react";
+import DataLoadError from "@/Components/DataLoadError";
 import { ProvincesSkeleton } from "@/Components/Skeletons";
 
 interface ProvinceParty {
@@ -37,9 +38,9 @@ const PARTY_FALLBACK = "https://jcss-generalelection2082.ekantipur.com/assets/im
 const ProvincesPage = () => {
   const [search, setSearch] = useState("");
 
-  const { data, isLoading, isError, error } = useQuery<ProvinceStatusResponse>({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery<ProvinceStatusResponse>({
     queryKey: ["province-status"],
-    queryFn: () => api.get("/elections/status"),
+    queryFn: () => api.get("/elections/status", { showErrorToast: false }),
     staleTime: Infinity
   });
 
@@ -101,17 +102,11 @@ const ProvincesPage = () => {
         {isLoading ? <ProvincesSkeleton /> : null}
 
         {isError ? (
-          <section className="rounded-xl border border-destructive/40 bg-destructive/10 p-6 text-destructive">
-            <p className="inline-flex items-center gap-2 text-sm font-semibold">
-              <AlertTriangle className="h-4 w-4" />
-              Unable to load province results
-            </p>
-            <p className="mt-2 text-sm">
-              {String((error as { message?: string })?.message || "").includes("Result not found in cache")
-                ? "Result not found. Contact the developer."
-                : String((error as { message?: string })?.message || "Unknown error")}
-            </p>
-          </section>
+          <DataLoadError
+            title="Province results are temporarily unavailable"
+            onRetry={() => void refetch()}
+            isRetrying={isFetching}
+          />
         ) : null}
 
         {!isLoading && !isError && filteredProvinces.length ? (
