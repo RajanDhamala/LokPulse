@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="LokPulse">
+  <style>
+    :root { color: #09090b; }
+    @media (prefers-color-scheme: dark) { :root { color: #fafafa; } }
+  </style>
+  <mask id="lokpulse-logo-mask" maskUnits="userSpaceOnUse" x="2" y="2" width="60" height="60">
+    <rect x="2" y="2" width="60" height="60" rx="14" fill="white"/>
+    <path d="M15 15V39H27" fill="none" stroke="black" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M31 40V15H41C48 15 52 18.5 52 24.5C52 30.5 48 34 41 34H31" fill="none" stroke="black" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M12 49H19L22 45L26 54L30 49H52" fill="none" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </mask>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="currentColor" mask="url(#lokpulse-logo-mask)"/>
+</svg>

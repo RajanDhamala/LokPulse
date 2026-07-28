@@ -3,6 +3,8 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# Private data ingestion pipeline
 scripts/
 
 logs/

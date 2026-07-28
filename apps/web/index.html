@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#000000" />
+  <script>
+    (() => {
+      const storageKey = "lokpulse-theme";
+      let theme;
+      try {
+        const storedTheme = window.localStorage.getItem(storageKey);
+        theme =
+          storedTheme === "light" || storedTheme === "dark"
+            ? storedTheme
+            : window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+      } catch {
+        theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+
+      document.documentElement.classList.toggle("dark", theme === "dark");
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.style.colorScheme = theme;
+      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#000000" : "#f5f3ef");
+    })();
+  </script>
+
+  <link rel="icon" type="image/svg+xml" href="/lokpulse-mark.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description"
+    content="Explore Nepal General Election 2082 results by candidate, party, province, district, constituency, and map with LokPulse." />
+  <meta name="keywords"
+    content="Nepal Election 2082, Nepal election results, candidate results, party standings, province results, constituency results, LokPulse" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta name="application-name" content="LokPulse" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="LokPulse" />
+  <meta property="og:locale" content="en_NP" />
+  <meta property="og:title" content="LokPulse | Nepal Election 2082 Results" />
+  <meta property="og:description"
+    content="Browse Nepal Election 2082 candidates, party standings, province summaries, constituency results, and maps." />
+
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="LokPulse | Nepal Election 2082 Results" />
+  <meta name="twitter:description"
+    content="Browse Nepal Election 2082 candidates, party standings, province summaries, constituency results, and maps." />
+
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "LokPulse",
+      "description": "A results explorer for Nepal General Election 2082 candidates, parties, provinces, constituencies, and maps.",
+      "applicationCategory": "NewsApplication",
+      "operatingSystem": "Any",
+      "inLanguage": ["en", "ne"],
+      "isAccessibleForFree": true,
+      "about": {
+        "@type": "Thing",
+        "name": "Nepal General Election 2082"
+      }
+    }
+  </script>
+
+  <title>LokPulse | Nepal Election 2082 Results</title>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>
