@@ -1,41 +1,100 @@
-name: Frontend CI
+name: LokPulse CI
 
 on:
   push:
-    branches: [main]
-    paths:
-      - "front/**"
+    branches: ["main"]
   pull_request:
-    branches: [main]
-    paths:
-      - "front/**"
+    branches: ["main"]
 
 permissions:
   contents: read
 
+env:
+  IMAGE_NAME: ghcr.io/rajandhamala/lokpulse-api
+
 jobs:
-  build:
-    name: Typecheck & Build
+  web:
+    name: Web checks
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./front
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
         with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: front/package-lock.json
+          version: 10.25.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
+        working-directory: apps/web
 
-      - name: Typecheck
-        run: npx tsc --noEmit
+      - name: Lint
+        run: pnpm lint
+        working-directory: apps/web
 
       - name: Build
-        run: npm run build
+        run: pnpm build
+        working-directory: apps/web
+        env:
+          VITE_BASE_URL: /api
 
+  api:
+    name: API checks and image
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.25.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/api/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: apps/api
+
+      - name: Test
+        run: pnpm test
+        working-directory: apps/api
+
+      - name: Login to GitHub Container Registry
+        if: github.event_name == 'push'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build API image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./apps/api
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}

@@ -1,171 +1,108 @@
 # LokPulse
 
-A real-time election results dashboard for tracking vote counts, leading candidates, and party standings across all provinces, districts, and constituencies of Nepal.
+LokPulse is a Nepal Election 2082 results explorer designed for the pace of national vote-count coverage. It brings candidate totals, province summaries, party standings, constituency details, and geographic results into one fast, readable interface.
 
-Users can browse popular candidates, compare party performance, drill into individual constituency races, and bookmark their favourite candidates — all updated periodically as results come in.
+The public application is read-only. Election data is collected separately, stored in MongoDB, and served through a small Express API so the frontend can focus on browsing and comparing results.
 
 ![React](https://img.shields.io/badge/React_19-61DAFB?logo=react&logoColor=black)
 ![Express](https://img.shields.io/badge/Express_5-000?logo=express)
-![MongoDB](https://img.shields.io/badge/MongoDB_Atlas-47A248?logo=mongodb&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-47A248?logo=mongodb&logoColor=white)
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS_4-06B6D4?logo=tailwindcss&logoColor=white)
 ![CI](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?logo=githubactions&logoColor=white)
 
----
+## What LokPulse provides
 
-## Features
-
-- **Live Vote Counts** — View up-to-date vote tallies for every constituency as results are published.
-- **Popular Candidates** — See the most-watched races with leading and trailing candidates at a glance.
-- **Province Overview** — Party-wise seat counts (elected + leading) broken down by all 7 provinces.
-- **Party Standings** — Nationwide party leaderboard with elected and leading seat totals.
-- **Constituency Drill-Down** — Cascading Province → District → Constituency filters to find any race instantly.
-- **Favourites** — Bookmark candidates you want to track; persisted in local storage.
-- **Search** — Filter candidates and districts by name across every page.
-- **Dark Theme** — Designed for comfortable viewing during long result nights.
-- **Skeleton Loading** — Content-shaped loading states instead of spinners for a polished feel.
-- **Periodic Data Updates** — Backend data is refreshed periodically via local scripts that respect source rate limits.
-
----
+- Popular candidate races with leading and competing candidates.
+- Results grouped across all seven provinces.
+- Nationwide party standings.
+- Province, district, and constituency filters.
+- Detailed candidate totals for each constituency.
+- A geographic summary of constituency results.
+- Candidate and district search.
+- Favourite districts stored locally in the browser.
+- Responsive light and dark themes.
 
 ## Architecture
 
-```
-┌─────────────┐        ┌──────────────┐        ┌──────────────┐
-│   Frontend   │──GET──▶│   Backend    │◀──────▶│ MongoDB Atlas│
-│  React SPA   │        │  Express API │        │              │
-└─────────────┘        └──────────────┘        └──────┬───────┘
-                                                       │
-                                               ┌──────┴───────┐
-                                               │   Scripts     │
-                                               │ (local only)  │
-                                               └──────────────┘
+```text
+Data scripts ──write──▶ MongoDB ◀──read── Express API ◀──GET── React SPA
 ```
 
-| Layer | Description |
-|-------|-------------|
-| **Frontend** (`front/`) | React 19 + Vite 7 SPA with TailwindCSS v4, TanStack Query for data fetching, React Router v7 for navigation. |
-| **Backend** (`back/`) | Read-only Express 5 REST API. No write endpoints are exposed — only GET requests are served. Secured with Helmet, CORS allowlist, and rate limiting. |
-| **Scripts** (`scripts/`) | Standalone Node.js project that fetches and parses election pages, then writes results directly to MongoDB. Runs locally or on a schedule — never exposed to the internet. |
+| Layer | Location | Purpose |
+| --- | --- | --- |
+| Web | `apps/web` | React 19, Vite, Tailwind CSS, TanStack Query, and React Router. |
+| API | `apps/api` | Read-only Express 5 API with Mongoose, Helmet, CORS, and rate limiting. |
+| Data pipeline | Private local `scripts` workspace | Collects and refreshes election records outside the deployed application. Its source is not published. |
 
----
+## Using LokPulse
 
-## API Endpoints
+LokPulse is intended to be used through its hosted web application. Visitors can explore the published election results without installing the project, configuring MongoDB, or running the data pipeline.
 
-All endpoints are **GET-only** and served under `/elections`.
+The repository contains the web and API application code used for deployment, but it does not distribute the MongoDB dataset or the private ingestion source required to recreate the complete backend. It is therefore not presented as a self-contained election-data package.
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /elections/eval` | Popular candidates grouped by district |
-| `GET /elections/status` | Province-wise party seat counts |
-| `GET /elections/party-status` | Nationwide party standings |
-| `GET /elections/filters` | Province → District → Constituency filter tree |
-| `GET /elections/constituency` | Single constituency result (query: `provinceId`, `district`, `constituencyNo`) |
-| `GET /health` | Health check |
+## Private data operations
 
----
+The `scripts/` directory is kept in the local project but excluded from Git. The layout is shown here only to document how the maintained system is organized:
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 20+
-- MongoDB Atlas cluster (or local MongoDB)
-
-### Backend
-
-```bash
-cd back
-cp .env.example .env        # fill in MONGODB_URL, ALLOWED_ORIGINS
-npm install
-npm run dev                  # starts on :8000
+```text
+scripts/                       # Private, local-only, and ignored by Git
+├── lib/                       # Database and fetch helpers
+├── schemas/                   # Data-pipeline Mongoose models
+├── scrapeHomepage.js          # Province, party, and location snapshots
+├── scrapePopularCandidates.js # Popular candidate snapshot
+├── crawlConstituencies.js     # Constituency result collection
+├── fullRefresh.js             # Complete refresh sequence
+├── autoRefresh.js             # Scheduled refresh loop
+└── updateRecord.js            # Targeted record maintenance
 ```
 
-### Frontend
-
-```bash
-cd front
-cp .env.example .env        # set VITE_BASE_URL to your backend URL
-npm install
-npm run dev                  # starts on :5173
-```
-
-### Data Scripts
-
-Scripts are a separate project that populate the database. They are not part of the deployed app.
+Maintainer-only commands used from the private local workspace:
 
 ```bash
 cd scripts
-cp .env.example .env        # same MONGODB_URL as backend
 npm install
 
-npm run scrape:home          # provinces, parties, location index
-npm run scrape:popular       # popular candidates
-npm run scrape:constituencies # all constituency results (rate-limited)
-npm run scrape:full          # run everything in sequence
+npm run scrape:homepage
+npm run scrape:popular
+npm run scrape:constituencies
+npm run scrape:full
 ```
 
-To update a single constituency manually:
+## Continuous integration
 
-```bash
-npm run db:update -- constituency --district Kathmandu --constituency 1
+The `LokPulse CI` workflow runs on pull requests and pushes to `main`.
+
+- Web: frozen pnpm install, ESLint, TypeScript, and Vite production build.
+- API: frozen pnpm install and tests.
+- Container: build the API image for every workflow run and publish `latest` plus the commit SHA to GitHub Container Registry after a push to `main`.
+
+## Project structure
+
+```text
+.
+├── apps
+│   ├── api
+│   │   ├── src/Controllers
+│   │   ├── src/Routes
+│   │   ├── src/Schemas
+│   │   └── Dockerfile
+│   └── web
+│       ├── public
+│       └── src
+├── scripts                 # Private local pipeline; ignored by Git
+│   ├── lib
+│   ├── schemas
+│   ├── scrapeHomepage.js
+│   ├── scrapePopularCandidates.js
+│   ├── crawlConstituencies.js
+│   └── fullRefresh.js
+└── .github/workflows
 ```
 
----
+## Data note
 
-## Deployment
-
-The backend includes a production **Dockerfile** (Node 20 Alpine, multi-stage build).
-
-```bash
-cd back
-docker build -t election-api .
-docker run -p 8000:8000 \
-  -e MONGODB_URL="mongodb+srv://..." \
-  -e ALLOWED_ORIGINS="https://yourdomain.com" \
-  -e RATE_LIMIT_PER_MINUTE=100 \
-  election-api
-```
-
-On platforms like **Render**, set environment variables in the dashboard — they are injected into the container at runtime automatically.
-
-The frontend builds to static files (`npm run build`) and can be served from any CDN or static host (Vercel, Netlify, Nginx, etc.).
-
----
-
-## CI
-
-GitHub Actions runs on every push/PR to `main` that touches `front/`:
-
-- **Typecheck** — `tsc --noEmit`
-- **Build** — `vite build`
-- **Lint** — `eslint`
-
----
-
-## Project Structure
-
-```
-├── front/                 # React SPA
-│   ├── src/Pages/         # Route pages (Popular, Provinces, Parties, Constituency, 404)
-│   ├── src/Components/    # Shared components (AppMenu, Skeletons)
-│   └── nginx.conf         # Production Nginx config
-├── back/                  # Express API (read-only)
-│   ├── src/Controllers/   # Request handlers
-│   ├── src/Schemas/       # Mongoose models
-│   ├── src/Routes/        # Route definitions
-│   └── Dockerfile         # Production container
-├── scripts/               # Data pipeline (local only)
-│   ├── schemas/           # Mongoose models (shared definitions)
-│   ├── lib/               # Parsers, fetcher, DB connection
-│   └── *.js               # Individual scrape/update scripts
-└── .github/workflows/     # CI pipeline
-```
-
----
+LokPulse presents election information collected from publicly available reporting sources. It is an independent results explorer and should not be treated as an official election authority.
 
 ## License
 
-This project is intended for educational and non-commercial use.
-
-The data displayed is collected from publicly available sources such as news portals and official election reporting websites. 
-All rights to the data belong to their respective owners.
+This project is intended for educational and non-commercial use. Rights to source election data remain with their respective publishers.
