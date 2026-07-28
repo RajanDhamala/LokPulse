@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/Utils/AxiosWrapper";
 import { FINAL_RESULTS_PUBLISHED_LABEL } from "@/lib/time";
-import { AlertTriangle, Clock3, SearchX } from "lucide-react";
+import { Clock3, SearchX } from "lucide-react";
+import DataLoadError from "@/Components/DataLoadError";
 import { PartiesSkeleton } from "@/Components/Skeletons";
 
 interface PartyResult {
@@ -27,9 +28,9 @@ const PARTY_FALLBACK = "https://jcss-generalelection2082.ekantipur.com/assets/im
 
 const PartiesPage = () => {
   const [search, setSearch] = useState("");
-  const { data, isLoading, isError, error } = useQuery<PartyStatusResponse>({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery<PartyStatusResponse>({
     queryKey: ["party-status"],
-    queryFn: () => api.get("/elections/party-status"),
+    queryFn: () => api.get("/elections/party-status", { showErrorToast: false }),
     staleTime: Infinity
   });
 
@@ -94,17 +95,11 @@ const PartiesPage = () => {
         {isLoading ? <PartiesSkeleton /> : null}
 
         {isError ? (
-          <section className="rounded-xl border border-destructive/40 bg-destructive/10 p-6 text-destructive">
-            <p className="inline-flex items-center gap-2 text-sm font-semibold">
-              <AlertTriangle className="h-4 w-4" />
-              Unable to load party results
-            </p>
-            <p className="mt-2 text-sm">
-              {String((error as { message?: string })?.message || "").includes("Result not found in cache")
-                ? "Result not found. Contact the developer."
-                : String((error as { message?: string })?.message || "Unknown error")}
-            </p>
-          </section>
+          <DataLoadError
+            title="Party results are temporarily unavailable"
+            onRetry={() => void refetch()}
+            isRetrying={isFetching}
+          />
         ) : null}
 
         {!isLoading && !isError && filteredParties.length ? (

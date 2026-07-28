@@ -12,8 +12,9 @@ import {
   sanitizePartyStatus,
   sanitizeConstituencyResult,
 } from "../lib/sanitizers.js";
+import { createFinalResultLoader } from "../lib/finalResultCache.js";
 
-const evaluateCandidates = asyncHandler(async (req, res) => {
+const loadPopularCandidates = async () => {
   const snapshot = await PopularSnapshot.findOne({ key: "popular-candidates" }).lean();
 
   if (!snapshot) {
@@ -22,18 +23,16 @@ const evaluateCandidates = asyncHandler(async (req, res) => {
 
   const candidates = snapshot.candidates || [];
 
-  return res.send(
-    new ApiResponse(200, "Popular candidates evaluated", {
-      count: snapshot.count || candidates.length,
-      lastScraped: snapshot.lastScraped,
-      cacheUpdatedAt: snapshot.updatedAt || snapshot.lastScraped,
-      isCompleted: !!snapshot.isCompleted,
-      candidates: sanitizePopularCandidates(candidates),
-    })
-  );
-});
+  return {
+    count: snapshot.count || candidates.length,
+    lastScraped: snapshot.lastScraped,
+    cacheUpdatedAt: snapshot.updatedAt || snapshot.lastScraped,
+    isCompleted: !!snapshot.isCompleted,
+    candidates: sanitizePopularCandidates(candidates),
+  };
+};
 
-const getProvinceStatus = asyncHandler(async (req, res) => {
+const loadProvinceStatus = async () => {
   const snapshot = await ProvinceSnapshot.findOne({ key: "province-status" }).lean();
 
   if (!snapshot) {
@@ -42,18 +41,16 @@ const getProvinceStatus = asyncHandler(async (req, res) => {
 
   const provinces = snapshot.provinces || [];
 
-  return res.send(
-    new ApiResponse(200, "Province status loaded from cache", {
-      extractedAt: new Date().toISOString(),
-      lastScraped: snapshot.lastScraped,
-      cacheUpdatedAt: snapshot.updatedAt || snapshot.lastScraped,
-      count: snapshot.count || provinces.length,
-      provinces: sanitizeProvinceParties(provinces),
-    })
-  );
-});
+  return {
+    extractedAt: new Date().toISOString(),
+    lastScraped: snapshot.lastScraped,
+    cacheUpdatedAt: snapshot.updatedAt || snapshot.lastScraped,
+    count: snapshot.count || provinces.length,
+    provinces: sanitizeProvinceParties(provinces),
+  };
+};
 
-const getPartyStatus = asyncHandler(async (req, res) => {
+const loadPartyStatus = async () => {
   const snapshot = await PartySnapshot.findOne({ key: "party-status" }).lean();
 
   if (!snapshot) {
@@ -62,20 +59,33 @@ const getPartyStatus = asyncHandler(async (req, res) => {
 
   const parties = snapshot.parties || [];
 
-  return res.send(
-    new ApiResponse(200, "Party status loaded from cache", {
-      extractedAt: new Date().toISOString(),
-      lastScraped: snapshot.lastScraped,
-      cacheUpdatedAt: snapshot.updatedAt || snapshot.lastScraped,
-      title: snapshot.title || "पार्टीगत नतिजा",
-      count: snapshot.count || parties.length,
-      parties: sanitizePartyStatus(parties),
-    })
-  );
-});
+  return {
+    extractedAt: new Date().toISOString(),
+    lastScraped: snapshot.lastScraped,
+    cacheUpdatedAt: snapshot.updatedAt || snapshot.lastScraped,
+    title: snapshot.title || "पार्टीगत नतिजा",
+    count: snapshot.count || parties.length,
+    parties: sanitizePartyStatus(parties),
+  };
+};
 
-const getMapSummary = asyncHandler(async (req, res) => {
+const loadMapSummary = async () => {
   const constituencies = await ConstituencyResult.aggregate([
+    {
+      $set: {
+        winner: {
+          $arrayElemAt: [
+            {
+              $sortArray: {
+                input: { $ifNull: ["$candidates", []] },
+                sortBy: { totalVotes: -1, position: 1 },
+              },
+            },
+            0,
+          ],
+        },
+      },
+    },
     {
       $project: {
         _id: 0,
@@ -84,52 +94,40 @@ const getMapSummary = asyncHandler(async (req, res) => {
         districtName: 1,
         constituencyNo: 1,
         isCompleted: { $ifNull: ["$isCompleted", false] },
-        candidates: {
-          $map: {
-            input: {
-              $slice: [
-                {
-                  $sortArray: {
-                    input: "$candidates",
-                    sortBy: { totalVotes: -1 },
-                  },
-                },
-                3,
-              ],
-            },
-            as: "c",
-            in: {
-              candidateName: "$$c.candidateName",
-              partyName: "$$c.partyName",
+        winner: {
+          $cond: [
+            { $eq: [{ $ifNull: ["$winner", null] }, null] },
+            null,
+            {
+              partyName: "$winner.partyName",
               partyImage: {
                 $ifNull: [
-                  "$$c.partyImage",
-                  { $ifNull: ["$$c.partyAvatarUrl", null] },
+                  "$winner.partyImage",
+                  { $ifNull: ["$winner.partyAvatarUrl", null] },
                 ],
               },
-              candidateImage: {
-                $ifNull: [
-                  "$$c.candidateImage",
-                  { $ifNull: ["$$c.candidateAvatarUrl", null] },
-                ],
-              },
-              totalVotes: { $ifNull: ["$$c.totalVotes", 0] },
+              totalVotes: { $ifNull: ["$winner.totalVotes", 0] },
             },
-          },
+          ],
         },
+      },
+    },
+    {
+      $sort: {
+        provinceId: 1,
+        districtSlug: 1,
+        constituencyNo: 1,
       },
     },
   ]);
 
-  return res.send(
-    new ApiResponse(200, "Map summary loaded", {
-      count: constituencies.length,
-      constituencies,
-    })
-  );
-});
+  return {
+    count: constituencies.length,
+    constituencies,
+  };
+};
 
-const getLocationFilters = asyncHandler(async (req, res) => {
+const loadLocationFilters = async () => {
   const locations = await LocationIndex.find()
     .sort({ provinceId: 1, districtSlug: 1, constituencyNo: 1 })
     .lean();
@@ -167,13 +165,63 @@ const getLocationFilters = asyncHandler(async (req, res) => {
     currentDistrict.constituencies.push(location.constituencyNo);
   }
 
+  return {
+    provinceCount: provinces.length,
+    districtCount,
+    constituencyCount: locations.length,
+    provinces,
+  };
+};
+
+const getPopularCandidatesData = createFinalResultLoader(loadPopularCandidates);
+const getProvinceStatusData = createFinalResultLoader(loadProvinceStatus);
+const getPartyStatusData = createFinalResultLoader(loadPartyStatus);
+const getMapSummaryData = createFinalResultLoader(loadMapSummary);
+const getLocationFiltersData = createFinalResultLoader(loadLocationFilters);
+
+const evaluateCandidates = asyncHandler(async (_req, res) => {
   return res.send(
-    new ApiResponse(200, "Location filters loaded", {
-      provinceCount: provinces.length,
-      districtCount,
-      constituencyCount: locations.length,
-      provinces,
-    })
+    new ApiResponse(
+      200,
+      "Popular candidates evaluated",
+      await getPopularCandidatesData()
+    )
+  );
+});
+
+const getProvinceStatus = asyncHandler(async (_req, res) => {
+  return res.send(
+    new ApiResponse(
+      200,
+      "Province status loaded from cache",
+      await getProvinceStatusData()
+    )
+  );
+});
+
+const getPartyStatus = asyncHandler(async (_req, res) => {
+  return res.send(
+    new ApiResponse(
+      200,
+      "Party status loaded from cache",
+      await getPartyStatusData()
+    )
+  );
+});
+
+const getMapSummary = asyncHandler(async (_req, res) => {
+  return res.send(
+    new ApiResponse(200, "Map summary loaded", await getMapSummaryData())
+  );
+});
+
+const getLocationFilters = asyncHandler(async (_req, res) => {
+  return res.send(
+    new ApiResponse(
+      200,
+      "Location filters loaded",
+      await getLocationFiltersData()
+    )
   );
 });
 
