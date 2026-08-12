@@ -10,6 +10,8 @@ RUN pnpm install --frozen-lockfile --prod
 
 COPY --chown=node:node . .
 
+RUN chown -R node:node /app
+
 USER node
 
 EXPOSE 8000

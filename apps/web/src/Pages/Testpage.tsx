@@ -1,5 +1,15 @@
 
-import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
+import {
+  memo,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type SyntheticEvent,
+} from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/Utils/AxiosWrapper";
 import { CheckCircle2, Clock3, SearchX, Star } from "lucide-react";
@@ -38,6 +48,81 @@ interface PopularCandidatesResponse {
 const IMAGE_FALLBACK = "https://jcss-generalelection2082.ekantipur.com/assets/images/user-placeholder.svg";
 const PARTY_FALLBACK = "https://jcss-generalelection2082.ekantipur.com/assets/images/default-party.jpeg";
 const FAVORITE_DISTRICTS_KEY = "favorite-districts";
+const EMPTY_IMAGE = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
+
+type ThumbnailKind = "candidates" | "parties";
+
+const getThumbnailUrl = (source: string, kind: ThumbnailKind) => {
+  try {
+    const filename = new URL(source).pathname.split("/").pop();
+    if (!filename) return source;
+    const extensionIndex = filename.lastIndexOf(".");
+    const stem = (extensionIndex > 0 ? filename.slice(0, extensionIndex) : filename).replace(
+      /[^a-zA-Z0-9_-]/g,
+      "-",
+    );
+    return `/popular-thumbnails/${kind}/${stem}.webp`;
+  } catch {
+    return source;
+  }
+};
+
+const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+  const image = event.currentTarget;
+  const originalSource = image.dataset.originalSource;
+  const fallbackSource = image.dataset.fallbackSource;
+
+  if (originalSource && image.src !== originalSource) {
+    image.src = originalSource;
+    return;
+  }
+
+  if (fallbackSource && fallbackSource !== originalSource && image.src !== fallbackSource) {
+    image.src = fallbackSource;
+    return;
+  }
+
+  image.onerror = null;
+};
+
+const OptimizedImage = memo(({
+  source,
+  fallback,
+  kind,
+  alt,
+  width,
+  height,
+  className,
+  shouldLoad,
+}: {
+  source?: string;
+  fallback: string;
+  kind: ThumbnailKind;
+  alt: string;
+  width: number;
+  height: number;
+  className: string;
+  shouldLoad: boolean;
+}) => {
+  const originalSource = source || fallback;
+  const thumbnailSource = getThumbnailUrl(originalSource, kind);
+
+  return (
+    <img
+      src={shouldLoad ? thumbnailSource : EMPTY_IMAGE}
+      data-original-source={originalSource}
+      data-fallback-source={fallback}
+      alt={alt}
+      width={width}
+      height={height}
+      loading="lazy"
+      decoding="async"
+      fetchPriority="low"
+      onError={shouldLoad ? handleImageError : undefined}
+      className={className}
+    />
+  );
+});
 
 const formatVoteChange = (value?: string) => {
   if (!value) return "";
@@ -100,7 +185,11 @@ const buildFilteredDistricts = ({
     .map((item) => item.district);
 };
 
-const LeaderCard = ({ candidate, isCompleted }: { candidate: Candidate; isCompleted?: boolean }) => (
+const LeaderCard = memo(({ candidate, isCompleted, shouldLoadImages }: {
+  candidate: Candidate;
+  isCompleted?: boolean;
+  shouldLoadImages: boolean;
+}) => (
   <div className={`relative min-w-0 overflow-hidden rounded-lg border p-3 shadow-[0_1px_2px_rgb(15_23_42/0.05)] sm:p-4 dark:rounded-xl dark:shadow-sm ${isCompleted
     ? "border-emerald-200/70 border-l-[3px] border-l-emerald-500 bg-gradient-to-br from-emerald-50/70 via-card to-card dark:border-emerald-500/40 dark:border-l-emerald-500/40 dark:bg-gradient-to-b dark:from-emerald-500/20 dark:via-card/90 dark:to-card/90"
     : "border-border/80 bg-card dark:border-primary/20 dark:bg-gradient-to-b dark:from-primary/15 dark:via-card/90 dark:to-card/90"
@@ -112,21 +201,27 @@ const LeaderCard = ({ candidate, isCompleted }: { candidate: Candidate; isComple
       {isCompleted ? "✓ Winner" : "Leading candidate"}
     </p>
     <div className="flex min-w-0 items-start gap-3">
-      <img
-        src={candidate.avatar || IMAGE_FALLBACK}
+      <OptimizedImage
+        source={candidate.avatar}
+        fallback={IMAGE_FALLBACK}
+        kind="candidates"
         alt={candidate.name}
-        loading="lazy"
-        decoding="async"
+        width={64}
+        height={64}
+        shouldLoad={shouldLoadImages}
         className={`h-16 w-16 shrink-0 rounded-xl object-cover ring-2 ${isCompleted ? "ring-emerald-500/50" : "ring-primary/30"}`}
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-lg font-semibold tracking-tight text-foreground">{candidate.name || "Unknown candidate"}</p>
         <div className="mt-1 flex w-fit max-w-full items-center gap-2 rounded-full border border-border/80 bg-card px-2 py-1 text-xs text-muted-foreground dark:bg-background/70">
-          <img
-            src={candidate.partyImg || PARTY_FALLBACK}
+          <OptimizedImage
+            source={candidate.partyImg}
+            fallback={PARTY_FALLBACK}
+            kind="parties"
             alt={candidate.partyName || "Party"}
-            loading="lazy"
-            decoding="async"
+            width={16}
+            height={16}
+            shouldLoad={shouldLoadImages}
             className="h-4 w-4 shrink-0 rounded-full object-cover"
           />
           <span className="truncate">{candidate.partyName || "Independent / N/A"}</span>
@@ -146,26 +241,35 @@ const LeaderCard = ({ candidate, isCompleted }: { candidate: Candidate; isComple
     </div>
 
   </div>
-);
+));
 
-const CandidateRow = ({ candidate }: { candidate: Candidate }) => (
+const CandidateRow = memo(({ candidate, shouldLoadImages }: {
+  candidate: Candidate;
+  shouldLoadImages: boolean;
+}) => (
   <div className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border/70 bg-card px-3 py-2 shadow-[0_1px_1px_rgb(15_23_42/0.04)] dark:rounded-xl dark:border-border/70 dark:bg-card/60 dark:shadow-none">
     <div className="flex min-w-0 flex-1 items-center gap-3">
-      <img
-        src={candidate.avatar || IMAGE_FALLBACK}
+      <OptimizedImage
+        source={candidate.avatar}
+        fallback={IMAGE_FALLBACK}
+        kind="candidates"
         alt={candidate.name}
-        loading="lazy"
-        decoding="async"
+        width={40}
+        height={40}
+        shouldLoad={shouldLoadImages}
         className="h-10 w-10 shrink-0 rounded-lg object-cover ring-1 ring-border"
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-foreground">{candidate.name || "Unknown candidate"}</p>
         <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-          <img
-            src={candidate.partyImg || PARTY_FALLBACK}
+          <OptimizedImage
+            source={candidate.partyImg}
+            fallback={PARTY_FALLBACK}
+            kind="parties"
             alt={candidate.partyName || "Party"}
-            loading="lazy"
-            decoding="async"
+            width={16}
+            height={16}
+            shouldLoad={shouldLoadImages}
             className="h-4 w-4 rounded-full object-cover"
           />
           <span className="truncate">{candidate.partyName || "Independent / N/A"}</span>
@@ -176,7 +280,110 @@ const CandidateRow = ({ candidate }: { candidate: Candidate }) => (
       <p className="text-sm font-semibold tabular-nums text-foreground">{candidate.votes || "0"}</p>
     </div>
   </div>
-);
+));
+
+const useNearViewport = () => {
+  const elementRef = useRef<HTMLElement>(null);
+  const [isNearViewport, setIsNearViewport] = useState(false);
+
+  useEffect(() => {
+    const element = elementRef.current;
+    if (!element) return;
+
+    if (!("IntersectionObserver" in window)) {
+      setIsNearViewport(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setIsNearViewport(true);
+        observer.disconnect();
+      },
+      { rootMargin: "1200px 0px" },
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return { elementRef, isNearViewport };
+};
+
+const DistrictCard = memo(({
+  district,
+  isFavorite,
+  onToggleFavorite,
+}: {
+  district: DistrictCandidates;
+  isFavorite: boolean;
+  onToggleFavorite: (districtName: string) => void;
+}) => {
+  const { elementRef, isNearViewport } = useNearViewport();
+
+  return (
+    <article
+      ref={elementRef}
+      style={{ contentVisibility: "auto" }}
+      className={`min-w-0 h-full rounded-xl border border-border/80 bg-card p-3 sm:p-4 [contain-intrinsic-size:auto_480px] xl:[contain-intrinsic-size:auto_280px] ${district.isCompleted
+        ? "shadow-[0_1px_2px_rgb(15_23_42/0.05),0_10px_26px_-14px_rgb(15_23_42/0.2)] dark:border-emerald-500/40 dark:bg-gradient-to-br dark:from-emerald-500/10 dark:via-card/80 dark:to-card/75 dark:shadow-[0_15px_40px_-28px_rgba(16,185,129,0.4)]"
+        : "shadow-[0_1px_2px_rgb(15_23_42/0.05),0_10px_26px_-14px_rgb(15_23_42/0.2)] dark:shadow-sm"
+        }`}
+    >
+      <div className="mb-4 flex items-start justify-between gap-3 border-b border-border pb-3 dark:border-border/70">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <h2 className="min-w-0 break-words text-lg font-semibold">{district.districtName}</h2>
+          {district.isCompleted && (
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-400">
+              <CheckCircle2 className="h-4 w-4" />
+              Elected
+            </span>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onToggleFavorite(district.districtName)}
+            aria-label={isFavorite ? "Remove favorite district" : "Add favorite district"}
+            title={isFavorite ? "Favorited district" : "Mark district as favorite"}
+            className={`inline-flex h-11 w-11 items-center justify-center rounded-full border transition sm:h-9 sm:w-9 ${isFavorite
+              ? "border-amber-500/50 bg-amber-400/15 text-amber-700 hover:bg-amber-400/20 dark:text-amber-300"
+              : "border-border/70 bg-background/70 text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+          >
+            <Star className={`h-4 w-4 ${isFavorite ? "fill-current" : ""}`} />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid min-w-0 gap-4 xl:grid-cols-5">
+        <section className="min-w-0 xl:col-span-2">
+          <LeaderCard
+            candidate={district.leaderCandidate}
+            isCompleted={district.isCompleted}
+            shouldLoadImages={isNearViewport}
+          />
+        </section>
+
+        <section className="min-w-0 rounded-lg border border-transparent bg-muted/65 p-3 dark:rounded-xl dark:border-border/70 dark:bg-background/60 xl:col-span-3">
+          <p className="mb-3 text-xs font-medium uppercase tracking-[0.15em] text-muted-foreground">
+            Top side candidates
+          </p>
+          <div className="space-y-2">
+            {district.sideCandidates.map((candidate, index) => (
+              <CandidateRow
+                key={`${candidate.profileUrl || candidate.name}-${index}`}
+                candidate={candidate}
+                shouldLoadImages={isNearViewport}
+              />
+            ))}
+          </div>
+        </section>
+      </div>
+    </article>
+  );
+});
 
 const TestPage = () => {
   const [searchInput, setSearchInput] = useState("");
@@ -213,7 +420,7 @@ const TestPage = () => {
   }, [searchInput]);
 
   const favoriteSet = useMemo(() => new Set(favoriteDistricts), [favoriteDistricts]);
-  const toggleFavoriteDistrict = (districtName: string) => {
+  const toggleFavoriteDistrict = useCallback((districtName: string) => {
     setFavoriteDistricts((prev) => {
       const next = prev.includes(districtName)
         ? prev.filter((item) => item !== districtName)
@@ -221,7 +428,7 @@ const TestPage = () => {
       window.localStorage.setItem(FAVORITE_DISTRICTS_KEY, JSON.stringify(next));
       return next;
     });
-  };
+  }, []);
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const deferredNormalizedQuery = useDeferredValue(normalizedQuery);
@@ -307,58 +514,12 @@ const TestPage = () => {
         {!shouldShowProcessingSkeleton && !isError && processedDistricts.length ? (
           <section className="grid min-w-0 gap-5 2xl:grid-cols-2" aria-busy={isFiltering}>
             {processedDistricts.map((district) => (
-              <article
+              <DistrictCard
                 key={`${district.districtName}-${district.districtUrl || "no-url"}`}
-                className={`min-w-0 h-full rounded-xl border border-border/80 bg-card p-3 sm:p-4 ${district.isCompleted
-                  ? "shadow-[0_1px_2px_rgb(15_23_42/0.05),0_10px_26px_-14px_rgb(15_23_42/0.2)] dark:border-emerald-500/40 dark:bg-gradient-to-br dark:from-emerald-500/10 dark:via-card/80 dark:to-card/75 dark:shadow-[0_15px_40px_-28px_rgba(16,185,129,0.4)]"
-                  : "shadow-[0_1px_2px_rgb(15_23_42/0.05),0_10px_26px_-14px_rgb(15_23_42/0.2)] dark:shadow-sm"
-                  }`}
-              >
-                <div className="mb-4 flex items-start justify-between gap-3 border-b border-border pb-3 dark:border-border/70">
-                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                    <h2 className="min-w-0 break-words text-lg font-semibold">{district.districtName}</h2>
-                    {district.isCompleted && (
-                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-400">
-                        <CheckCircle2 className="h-4 w-4" />
-                        Elected
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleFavoriteDistrict(district.districtName)}
-                      aria-label={favoriteSet.has(district.districtName) ? "Remove favorite district" : "Add favorite district"}
-                      title={favoriteSet.has(district.districtName) ? "Favorited district" : "Mark district as favorite"}
-                      className={`inline-flex h-11 w-11 items-center justify-center rounded-full border transition sm:h-9 sm:w-9 ${favoriteSet.has(district.districtName)
-                        ? "border-amber-500/50 bg-amber-400/15 text-amber-700 hover:bg-amber-400/20 dark:text-amber-300"
-                        : "border-border/70 bg-background/70 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        }`}
-                    >
-                      <Star
-                        className={`h-4 w-4 ${favoriteSet.has(district.districtName) ? "fill-current" : ""}`}
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid min-w-0 gap-4 xl:grid-cols-5">
-                  <section className="min-w-0 xl:col-span-2">
-                    <LeaderCard candidate={district.leaderCandidate} isCompleted={district.isCompleted} />
-                  </section>
-
-                  <section className="min-w-0 rounded-lg border border-transparent bg-muted/65 p-3 dark:rounded-xl dark:border-border/70 dark:bg-background/60 xl:col-span-3">
-                    <p className="mb-3 text-xs font-medium uppercase tracking-[0.15em] text-muted-foreground">
-                      Top side candidates
-                    </p>
-                    <div className="space-y-2">
-                      {district.sideCandidates.map((candidate, index) => (
-                        <CandidateRow key={`${candidate.profileUrl || candidate.name}-${index}`} candidate={candidate} />
-                      ))}
-                    </div>
-                  </section>
-                </div>
-              </article>
+                district={district}
+                isFavorite={favoriteSet.has(district.districtName)}
+                onToggleFavorite={toggleFavoriteDistrict}
+              />
             ))}
           </section>
         ) : null}
